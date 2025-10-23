@@ -13,7 +13,10 @@ serve(async (req) => {
   }
 
   try {
-    const GEMINI_API_KEY = 'AIzaSyBl_9DUsk1gnDEMU4CnFCO5yEycpUj6IQ4';
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY is not configured');
+    }
 
     const { message, budget, city, propertyType, context } = await req.json();
     
@@ -48,52 +51,54 @@ Conversation History: ${context}` : 'This is a new conversation'}
 
 Remember: You're not just answering questions - you're guiding users through one of their most important life decisions. Be helpful, thorough, and supportive.`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: systemPrompt },
-              { text: `User message: ${message}` }
-            ]
-          }
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
         ],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        },
+        temperature: 0.7,
+        max_tokens: 1024,
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Gemini API error:', response.status, errorData);
-      
-      // Provide helpful fallback response
-      let fallbackResponse = "Hello! I'm PropertyBuddy, your Indian real estate assistant. 🏠\n\nI can help you with:\n- Finding properties based on your budget and location\n- Understanding property prices and market trends\n- Guidance on buying, selling, or renting\n- Property documentation and legal processes\n- Locality insights and amenities\n\nHow can I assist you with your property search today?";
+      const errorText = await response.text();
+      console.error('Lovable AI error:', response.status, errorText);
       
       if (response.status === 429) {
-        fallbackResponse = "I'm experiencing high demand right now. Let me help you with basic guidance:\n\nWhat are you looking for?\n1. Properties to buy\n2. Properties to rent\n3. Selling your property\n4. Property market information\n\nPlease tell me your requirements and I'll do my best to assist!";
+        return new Response(JSON.stringify({ 
+          error: "Rate limit exceeded. Please try again in a moment.",
+          response: "I'm experiencing high demand right now. Please try again in a moment!"
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
       
-      return new Response(JSON.stringify({ 
-        response: fallbackResponse,
-        timestamp: new Date().toISOString()
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ 
+          error: "Payment required. Please add credits to your workspace.",
+          response: "Service temporarily unavailable. Please contact support."
+        }), {
+          status: 402,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      throw new Error(`AI API error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('Gemini response:', JSON.stringify(data, null, 2));
+    console.log('AI response received:', JSON.stringify(data, null, 2));
     
-    const botResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 
+    const botResponse = data.choices?.[0]?.message?.content || 
       "I'm here to help you with your property search! Could you tell me more about what you're looking for?";
 
     console.log('Bot response generated successfully');
