@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageCircle, X, Send, Bot, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -184,7 +185,9 @@ What brings you here today?`,
                         ? 'bg-gradient-primary text-primary-foreground' 
                         : 'bg-card/80 text-card-foreground border border-border/50'
                     }`}>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                      <div className="text-sm leading-relaxed prose prose-sm max-w-none dark:prose-invert prose-p:my-2 prose-ul:my-2 prose-li:my-1">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
                       <span className="text-xs opacity-60 mt-2 block">
                         {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
